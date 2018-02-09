@@ -77,3 +77,91 @@ animalvolume
 rm(mydata$volume) #  this will not work
 mydata$volume <- NULL
 mydata
+
+# Commands and functions
+
+mean(mydata$length)
+?mean
+mean(mydata$length,trim = 0.25)
+missing <- c(4,5,6, NA)
+mean(missing)
+mean(missing,na.rm = TRUE)
+?read.csv
+read.csv("http://www.ut.ee/~iseppo/gdpestimate.csv")
+gdp<- read.csv("http://www.ut.ee/~iseppo/gdpestimate.csv")
+
+# Initial overview
+summary(gdp)
+str(gdp)
+head(gdp, n = 2)
+tail(gdp, n = 5)
+View(head(gdp, n = 10))
+
+# Your turn
+
+
+gdp$difference <- gdp$firstEstimate - gdp$latestEstimate
+
+summary(gdp)
+mean(gdp$difference)
+
+gdp$absdifference <- abs(gdp$difference)
+gdp$absdifference
+mean(gdp$absdifference)
+sd(gdp$absdifference)
+cor(gdp$firstEstimate, gdp$latestEstimate)
+
+# 
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaac.csv")
+str(piaac)
+dim(piaac) # Dimensions function
+summary(piaac$income)
+min(piaac$income, na.rm = T)
+max(piaac$income, na.rm = T)
+
+quantile(piaac$income, probs =  c(0.1, 0.5, 0.9),na.rm = TRUE)
+
+# Saving data
+write.csv(gdp, file= "gdpnew.csv")
+
+save(gdp, file = "gdpnew.Rdat")
+rm(gdp)
+load(file = "gdpnew.Rdat")
+dput(gdp, file = "gdp.txt")
+
+# Data types
+mypet <- "cat"
+class(mypet)
+
+mypet <- cat # this will give an error
+
+c <- TRUE
+class(c)
+
+class(gdp$date)
+
+a <- 4
+a +5
+whatisthis <-c(3, 4, "cat", 5)
+str(whatisthis)
+a<- 4
+a +5
+a <- as.character(a)
+a
+a + 5
+
+as.numeric(a)
+as.numeric(TRUE)
+
+# Factors
+factortest <- read.csv(file = "http://www.ut.ee/~iseppo/factortest.csv")
+factortest
+head(factortest)
+View(factortest)
+summary(factortest)
+factortest$numbers <- as.numeric(factortest$length)
+summary(factortest)
+View(factortest)
+
+factortest$correctnr <- as.numeric(as.character(factortest$length))
+summary(factortest)
