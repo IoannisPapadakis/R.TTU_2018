@@ -111,7 +111,7 @@ mean(gdp$absdifference)
 sd(gdp$absdifference)
 cor(gdp$firstEstimate, gdp$latestEstimate)
 
-# 
+#
 piaac <- read.csv("http://www.ut.ee/~iseppo/piaac.csv")
 str(piaac)
 dim(piaac) # Dimensions function
@@ -165,3 +165,21 @@ View(factortest)
 
 factortest$correctnr <- as.numeric(as.character(factortest$length))
 summary(factortest)
+
+
+# Dates
+# install.packages("lubridate")
+library(lubridate)
+
+dmy("02-01-2012")
+dmy("02/01 2034")
+
+today()
+
+dateToday <- today()
+mybirthday <- ymd("1978-03-04")
+mylifetime <- interval(mybirthday, dateToday)
+mylifetime/dweeks(1)
+mylifetime/ddays(1)
+mylifetime/dseconds(1)
+
