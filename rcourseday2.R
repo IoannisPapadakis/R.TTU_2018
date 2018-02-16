@@ -28,10 +28,11 @@ cor(piaac$pvnum1, piaac$pvlit1, use="complete.obs")
 
 
 # Getting data in 
-?read.csv
+?read.csv 
 read.csv(na.strings = c(NA, "", " ", ".")
 read.csv(strip.white = FALSE)
 read.csv(fileEncoding = )
+
 
 # 
 # install.packages("eurostat")
@@ -95,6 +96,7 @@ z <= 4
 x == z
 x != z
 is.na(x)
+!is.na(x)
 
 mydata$weight[1] <- NA
 mydata
@@ -198,7 +200,37 @@ ggsave(p.gdp, filename = "worldgdp.png",
        height = 4, width = 4, scale = 2)
 
 # Your turn
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+piaac$logincome <- log(piaac$earnhr)
 names(piaac)
 ggplot(data = piaac, aes(x = pvnum1, y = logincome)) +
+  geom_point(aes(color = gender,
+                 shape = children), alpha = 0.5) +
+  geom_smooth()
+
+# remove observations where children is.na
+piaac <- subset(piaac, !is.na(children))
+
+?geom_smooth
+
+ggplot(data = piaac, aes(x = pvnum1, y = logincome)) +
+  geom_point() +
+  geom_smooth(aes(color = gender))
+
+# Your turn
+gdp <- read.csv("http://www.ut.ee/~iseppo/gdpestimate.csv")
+str(gdp)
+gdp$date <- as.Date(gdp$date)
+
+ggplot(data = gdp, aes(x = date, y = latestEstimate)) +
+  geom_line()+
+  geom_line(aes(y = firstEstimate), color = "red")+
+  ylab("GDP Estimates")
+
+# Facets
+
+ggplot(data = piaac, aes(x = pvnum1, 
+                         y = earnmth,
+                         color = edlevel3)) +
   geom_point() +
   geom_smooth()
