@@ -16,7 +16,7 @@
 
 
 
-* **Class Location:** SOC- 416, Department of Economics and Finance, Tallinn University of Technology, Akadeemia tee 3, Tallinn.
+* **Class Location:** SOC- 417, Department of Economics and Finance, Tallinn University of Technology, Akadeemia tee 3, Tallinn.
 
 ## Course Description
 
