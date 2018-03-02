@@ -1,0 +1,908 @@
+---
+title: "Intro to R days 5 and 6"
+author: "Indrek Seppo and Nicolas Reigl"
+date: "March 2-3, 2017"
+output: tint::tintPdf
+---
+
+```{r setup, include=FALSE}
+library(tufte)
+# invalidate cache when the tufte version changes
+knitr::opts_chunk$set(tidy = FALSE, cache.extra = packageVersion('tufte'))
+options(width=80)
+library(Rmisc)
+library(ggplot2)
+library(dplyr)
+```
+
+
+```{marginfigure}
+![](./img/88x31.png){width=44px} This work is licensed under a Creative Commons Attribution 4.0 International License.
+
+Please contact indrek.seppo@ut.ee for source code or missing datasets. The course materials are uploaded to \url{https://github.com/nreigl/R.TTU_2018}
+```
+
+```{marginfigure}
+![](./img/hitsa-logo-eng.png){width=44px} Preparation of this course was supported by HITSA -- Estonian Information Technology Foundation for Education.
+```
+
+
+#From the previous sessions
+
+##dplyr and piping
+
+We went through the basics of data manipulation with dplyr last time. Recall that in the tidyverse -- modern R -- there was an "and then" operator: `%>%`. This sends the result of the last command to be the first argument of the next command. So a typical workflow would be something like this:
+
+```{r, eval=FALSE, tidy=F}
+newdataset <- initialdata %>%
+  filter(variable>4, !is.na(othervariable))%>%
+  group_by(variable1, variable2)%>%
+  summarize(meanofvar=mean(variable1, na.rm=TRUE), othervalue=myfunction(variable4, variable5))
+```
+
+The central package of `tidyverse` is `dplyr`, providing a grammar of data manipulation. The main verbs of dplyr's grammar of data manipulation were:
+
+1* **select()** for selecting variables, you can use helper functions like **starts_with()**, or select consequetive variables with `:` `variable1:othervariable`. Separate variables (or criterions) by commas.
+
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+1. Read the original piaac data in again
+
+```{r eval=F}
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+```
+
+
+```{r echo=F}
+piaac <- read.csv("piaacest.csv")
+```
+
+2. Create a new dataset `smallpiaac`, which contains only the variables `sequid`, `age`, `pvlit1`, `pvnum1`, `pvpsl1`.
+
+
+-----
+
+\color{black}
+
+Then there was **filter()** for subsetting the dataset. You can separate different conditions by commas, for example `sex=="Male", age > 29`. A useful way to select all the values in a set is to use `%in%` operator: `education %in% c("high", "medium")`.
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+1. overwrite piaac with a dataset derived from piaac where the NA-s in either edlevel3, studyarea or health variable are removed. Remember -- you have to use `is.na()` for this (actually `!is.na()`). 
+
+```{r echo=F}
+piaac <- piaac %>%
+  filter(!is.na(edlevel3), !is.na(studyarea), !is.na(health))
+```
+
+2. Create a new dataset `goodhealth`, which contains only those rows from piaac where health is either "Excellent" or "Very good".
+
+-----
+
+\color{black}
+
+
+And there was a powerful combination of:
+* **group_by()** -- creates groups in the data by any number of variables
+* **summarize()** -- computes some summarizing statistics of the variable (by groups if **group_by()** was used previously).
+
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+1. Create a new dataset which would include average wage (average of variable `earnmth`) per education level (variable `edlevel3`) and `gender`. Call the newly created variable `averagewage`. I think you should also use the `na.rm=T` while finding the averages.
+
+2. Lets make it bit more difficult -- add 25.th and 75.th percentiles of the wages to the previous `summarize()` call. You can find the percentiles using function `quantile()`, which needs a second argument as well: the percentile (probs=0...1, so 25.th percentile would be 0.25). You should just add this `probs=` to the quantile call after the variable you want to find the quantile of (and you will also need a third parameter telling it to not take into account the NA values -- `na.rm=T`. Call the new variables `pc25` and `pc75`. Then arrange the result by the variable `averagewage`, which you have just created.
+
+The result should look smth like this:
+```{r echo=FALSE, message=FALSE, warning=FALSE, paged.print=FALSE}
+newdata <- piaac %>%
+  group_by(edlevel3, gender)%>%
+  summarize(averagewage=mean(earnmth, na.rm=T), pc25=quantile(earnmth, probs=0.25, na.rm=T),
+            pc75=quantile(earnmth, probs=0.75, na.rm=T))%>%
+  arrange(averagewage)
+head(newdata, n=3)
+```
+
+\color{black}
+
+There was also **mutate** -- to add variables to the dataframe:
+
+```{r}
+piaac <- piaac %>%
+  mutate(relativewage = earnmth / mean(earnmth, na.rm=T))
+```
+
+Note that the `mean(earnmnth)` would here find the average earnings over the entire dataset. But mutate also works with `group_by()` -- if you use `group_by()`before it, it would take the average over this group. 
+
+A quick comment -- you would like to add `ungroup()` at the end as the groups would be saved to the dataset otherwise and later on this could cause some unexpected behaviour.
+
+
+
+## Couple of additions:
+
+* `summarize()` can only deal with functions which return a single value. There is another verb called `do()`, which can deal with functions which return a data frame. We will not touch it further here though.
+
+* there is a verb called `rename()`, which renames the variables. 
+
+
+```{r, eval=FALSE, tidy=F}
+library(dplyr)
+
+piaac.tmp <- piaac %>%
+  rename(personId=seqid)
+```
+
+Lets try it. Lets create a new dataset called numeracyaverages, so that it would contain mean numeracy levels by gender and studyarea:
+
+```{r, tidy=FALSE, eval=FALSE}
+
+numeracyaverages <- piaac %>%
+  group_by(gender, studyarea)%>%
+  summarize(meannum=mean(pvnum1, na.rm=TRUE))
+
+```
+
+
+#Conflicts in packages
+
+Install and load the **plyr** package. Note the warnings, they are easy to miss. Now run the previous command again:
+
+```{r, tidy=FALSE, eval=FALSE}
+
+numeracyaverages <- piaac %>%
+  group_by(gender, studyarea)%>%
+  summarize(meannum=mean(pvnum1, na.rm=TRUE))
+
+```
+
+See, what happens? We dont have them grouped anymore, as we are now using the functions from `plyr`, not `dplyr`. The only way out is to unload `dplyr` and then load it again (just typing `library(dplyr)` will not help, unloading is neccesary!). There are two ways to do it -- either uncheck dplyr from the `Packages` tab and check it again^[Sometimes you'd have to do it two times.], or write:
+
+```{r eval=F}
+detach("package:dplyr", unload=TRUE)
+```
+
+One way to solve this problem is to use the package name with the function name (and if you are using a lot of conflicting packages, you learn to do this):
+
+```{r, tidy=FALSE}
+
+numeracyaverages<-piaac %>%
+  dplyr::group_by(gender, studyarea)%>%
+  dplyr::summarize(meannum=mean(pvnum1, na.rm=TRUE))
+
+```
+
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+* Change the variable names in `piaac` to be more pleasing to the eye and graphs^[You can do it all in one `rename()` call, just remember to overwrite your previous dataset with the new one.]:
+
+    - pvlit1 to Literacy
+    - pvnum1 to Numeracy
+    - pvpsl1 to Problem solving skills^[You will need to use the quatation marks to quote the name if there are spaces in it!]
+    - earnmth to Income
+    - edlevel3 to Education
+    - health to Health
+
+```{r, message=FALSE, warning=FALSE, include=FALSE}
+piaac <- piaac %>%
+  rename(Literacy=pvlit1, Numeracy=pvnum1, "Problem solving skills"=pvpsl1, Income=earnmth, Education=edlevel3, Health=health)
+```
+
+
+* Remove all the lines where either Health, Education or Numeracy is missing^[Remember, variable!=NA will not work, you would want to use the `!is.na()` function.].
+
+```{r, include=FALSE}
+piaac <- piaac %>%
+  filter(!is.na(Health), !is.na(Education), !is.na(Numeracy))
+```
+
+
+* This is now very tricky stuff: find the mean, lower and upper confidence interval for the variable numeracy by Education level. Use the function `CI()` from package **Rmisc** for this. NB! You do not have this package installed yet. What is worse -- it will load the package **plyr** when you read it in. And this will f up your `dplyr`. You now need to detach dplyr and then reattach it! One way to do this is unmark it in the Packages pane and then mark it again. Another thing - `CI()` will return 3 values, but summarize can only deal with 1. What should we do? Take a look at what `CI()` returns, by running `CI(piaac$numeracy)` -- it returns a vector of three. How to access a single value? Just add `[1]` or `[2]` or `[3]` at the end of the call like this: `lower=CI(numeracy)[3]`. Write the resulting dataframe in a data object called **averages**.
+
+```{r, include=FALSE}
+averages <- piaac %>%
+  group_by(Education) %>%
+  summarize(upper=CI(Numeracy)[1], mean=CI(Numeracy)[2], lower=CI(Numeracy)[3])
+```
+This is what you should have as a result:
+
+```{r}
+averages
+```
+
+
+\color{black}
+
+##ggplot2
+
+A typical plot in the ggplot language looks something like this:
+
+```{r, eval=FALSE, tidy=FALSE}
+ggplot(data=mydataset, aes(x=firstvariable, y=secondvariable))+
+  geom_something(aes(color=groupingvariable))+
+  geom_otherthing(size=4)+
+  facet_wrap(~othergroupingvariable)
+```
+
+If you want something at the graph to be connected to your data, you will need to put it into the **aes()**-call. If you want to tell it yourself (like the `size=4` here), it has to be outside of the `aes()`-call.
+
+Lets create a new variable in the piaac dataset to study the relationship between working and numeracy. We have a variable called `empl_status` there, that can have three values
+
+```{r}
+unique(piaac$empl_status)
+```
+
+Lets create a new variable that is TRUE when this variable is `Employed` and `FALSE` if it something else:
+
+```{r}
+piaac$employed <- piaac$empl_status=="Employed"
+summary(piaac$employed)
+```
+
+And now lets convert it to numeric for graphing purposes. R will automatically convert TRUE-s to 1 and FALSE-s to 0:
+
+```{r}
+piaac$employed <- as.numeric(piaac$employed)
+```
+
+
+\vspace{4mm}  \color{red}Your turn: 
+
+
+To study a relationship between two continuous variables, you would usually use `geom_smooth()` -- it gives you smoothed conditional means by default.
+
+1) Create a graph showing the relationship between Numeracy and Literacy. Connect x to Numeracy and y to Literacy. Remember to use `aes()` for this, as you are connecting aesthetics to variables in your data! Show points using geom_point() and the relationship using geom_smooth().
+
+```{r echo=F, fig.cap="Expected result of the first exercise", fig.margin=T, message=FALSE, warning=FALSE}
+ggplot(piaac, aes(x=Numeracy, y=Literacy))+
+  geom_point()+
+  geom_smooth()
+```
+
+2) Take a look if there is a noticable difference of this relationship by education level by connecting the color to education level variable in geom_smooth(). Again, dont forget the `aes()`.
+
+
+
+3) You can graph binary outcomes the same way -- geom_smooth() gives you the expected value, whic would be the percentage of ones. Lets see if there is a connection between numeracy and the probability of being employed (we just created the variable). Recreate the graph on the sideline.
+
+
+```{r echo=F, fig.cap="Expected result of ex 3", fig.margin=T, message=FALSE, warning=FALSE}
+ggplot(piaac, aes(x=Numeracy, y=employed))+
+  geom_point()+
+  geom_smooth()
+```
+
+4) Ok, but maybe this is somewhat explained by the education level? Take a look by connecting color in the `geom_smooth()` to education.
+
+```{r echo=F, fig.cap="Expected result of ex 4", fig.margin=T, message=FALSE, warning=FALSE}
+ggplot(piaac, aes(x=Numeracy, y=employed))+
+  geom_point()+
+  geom_smooth(aes(color=Education))
+```
+
+5) And the same stuff once more. Create a graph showing the relationship between age and employment, showing the difference between men and women by education level (result is on the side). You see that it goes a bit crazy here for the people with low education -- it does not know that the probabilities can not go over or below 1 and 0, it overfits etc. But you will get the idea for High and Medium levels of education.
+
+```{r echo=F, fig.cap="Expected result of ex 5", fig.margin=T, message=FALSE, warning=FALSE}
+ggplot(piaac, aes(x=age, y=employed))+
+  geom_point()+
+  geom_smooth(aes(color=gender))+
+  facet_wrap(~Education)
+```
+
+
+-----
+
+ \color{black}
+ 
+ `geom_smooth()` actually allows you tou specify the functional relationship. Use `method="lm"` to get a linear model, or specify the function yourself. For example, if I would like to see how would the second order polynom perform here, I could give it an additional parameter of `formula = y ~ x^2` (but you would need to use the method="lm" aswell).
+  
+```{r, eval=F, message=FALSE, warning=FALSE}
+ggplot(piaac, aes(x=age, y=employed))+
+  geom_point()+
+  geom_smooth(aes(color=gender))+
+  geom_smooth(aes(color=gender), method="lm",  formula= y~poly(x,2))+
+  facet_wrap(~Education+gender)
+```
+
+##Factors
+
+We learned that for dealing with factors there is a package called `forcats`. To manually change the order of factor levels, you can use `fct_relevel()`. 
+
+For example: the current order of the `piaac$Health` is:
+
+```{r}
+levels(piaac$Health)
+```
+
+Lets change it:
+
+```{r}
+library(forcats)
+piaac <- piaac %>%
+  mutate(Health = fct_relevel(Health, "Poor", "Fair", "Good", "Very good", "Excellent"))
+levels(piaac$Health)
+```
+
+But you could also have done it with a one-liner:
+
+```{r eval=F}
+piaac$Health = fct_relevel(piaac$Health, "Poor", "Fair", "Good", "Very good", "Excellent")
+```
+
+To change the factor levels, you can use `fct_recode()`:
+
+```{r}
+levels(piaac$children)
+piaac <- piaac %>% 
+  mutate(children=fct_recode(children, "Has children"= "Yes", "No children"="No"))
+levels(piaac$children)
+```
+
+Third thing you would do quite a lot is order the level of factors by some variable. Lets create again a simple summarizing table of average numeracy scores by study area:
+
+```{r, fig.margin=T}
+numscores <- piaac %>%
+  group_by(studyarea)%>%
+  summarize(Numeracy = mean(Numeracy))
+
+ggplot(numscores, aes(x=Numeracy, y=studyarea))+
+  geom_point(shape=21, size=3, fill="white")
+```
+
+These are not in a nice order at all. What can we do to plot them so that the highest would be on top and the lowest in the bottom? We can change the order of level manually, but there is an easier way. We can use `fct_reorder()` from `forcats`:
+
+
+```{r}
+numscores$studyarea <- fct_reorder(numscores$studyarea, numscores$Numeracy)
+```
+
+Now try to run the plot again!
+
+\vspace{4mm}  \color{red}Your turn: 
+
+* Take the piaac dataset and change the levels of factor in Education variable so that "High" will become "Higher", "Low" to "Basic" and "Medium" to "Secondary". Use the **fct_recode()** function from the **forcats** package. The example from the help section will show you how to do it.
+
+```{r, include=FALSE}
+library(forcats)
+piaac$Education <- fct_recode(piaac$Education, Higher="High", Secondary="Medium", Basic="Low")
+```
+
+
+* Change the order of Education factor levels so that it will be Basic, Secondary, Higher. Use the **fct_relevel()** function from the forcats package to do it. The example in the help section will show you how to do it.
+
+```{r, include=FALSE}
+piaac$Education <- fct_relevel(piaac$Education, "Basic", "Secondary", "Higher")
+```
+
+\color{black} \vspace{5mm} 
+
+
+# R markdown
+Lets take a peek at R markdown. Create a new R markdown document by File -> New File -> R Markdown. Lets start with an html output at first. What you see, is an example document, that will give you a quick overview what you can do.
+
+Markdown is a lightweight document language, which can be translated to different types of outputs -- html, pdf, doc etc^[Some of the syntax can be output-specific though -- you would generate a page break differently when opting for pdf-output than doc.]. While there is no single markdown standard, it is pretty similar in wherever you encounter it, it is by no way R-specific. 
+
+Markdown provides some simple syntax, for example:
+
+`# Heading 1`
+
+`## Heading 2`
+
+`### Heading 3 `
+
+`*italic text* `
+
+`**bold text** `
+
+
+Bullet list:
+
+`  * something`
+
+`  * other`
+
+`  * third`
+
+Numbered list:
+
+`  1. something `
+
+`  2. other `
+
+`  3. third `
+
+You need to remember to add two linebreaks (so creating one empty line) to actually end a paragraph, start a list etc.
+
+To add a footnote, use `^[myfootnote]`. 
+
+And you do not actually need much more to create a well-structured, readable document.
+
+Lets try it.
+
+The only thing somewhat tedious is to generate tables, but luckily R provides a number of ways to do it for us. 
+
+To insert a code chunk press `Cntrl + Alt + i`, or use the green Insert New Codechunk pictogram from the top.
+
+What you need to know in using R Markdown is, that it kind of runs in its own environment. Thus the packages you have loaded in your RStudio session will have to be loaded again, the data will have to be loaded again etc. You can run everything in the document until the current line by either `Cntrl+ALT P` or by clicking `Run all previous chunks` pictogram on a code chunk.
+
+The `modify chunks options` is a particularly useful thing, you rarely need more (but at times you will). You usually do not want to show messages and warnings in your final document etc.
+
+To add tables, try `kable()` from `knitr` package. This will produce tables in the markdown format, so would work in pdf, doc and html without any changes.
+
+```{r eval=F}
+kable(averages)
+```
+
+
+But sometimes R will already produce readymade html or latex-code. To include this you should give a parameter `results=asis` to your code. For example -- install and load the library **xtable**:
+
+```{r, eval=FALSE}
+library(xtable)
+options(xtable.comment = FALSE)
+print(xtable(averages),type="html", include.rownames=FALSE)
+```
+
+For figures you have additional arguments -- `fig.cap=`, `fig.height=`, `out.height=` etc. 
+
+If you want to include pregenerated image, you can do it this way:
+
+`![Caption for the picture.](/path/to/image.png)`
+
+
+RStudio provides some additional RMarkdown templates. Check out the packages `tufte`^[Or `tint` (Tint Is Not Tufte) -- a slightly modified version of tufte this handout is written in.], `rticles` and `rmdformats`. Some additional information is available here: \url{https://blog.rstudio.org/2016/03/21/r-markdown-custom-formats/}. 
+
+And if you ever want to write a book with all the citations, cross-references etc, check out \url{https://bookdown.org/yihui/bookdown/}.
+
+# Lists
+
+List is a data structure that we will meet quite often. Data frame consists of vectors of the same length, list can include whatever.
+
+For example^[Note that we give names to list elements. R will not do it automatically, as it does for data frames.]:
+
+```{r }
+name<-"Masha"
+surname<-"Mishka"
+length<-1.65
+peripherals=data.frame(nr.of.fingers=c(5,5), nr.of.toes=c(5,5))
+mashadata <- list(first.name=name, surname=surname, length=length, peripherals=peripherals)
+class(mashadata)
+mashadata #vaatame sinna sisse:
+```
+
+Lists can contain lists that can contain lists etc.
+
+To address a single element of list we can use the $-sign:
+
+```{r }
+mashadata$first.name
+```
+
+Or double straight brackets (the name of the element has to be quoted then):
+
+```{r }
+mashadata[["first.name"]]
+```
+
+
+You can in fact use single straight brackets, but they will return a list, not the initial data type (the data.frame, which we included in the list), which you will want to get in practice.
+
+
+```{r }
+class(mashadata["peripherals"])
+      
+class(mashadata[["peripherals"]])
+```
+
+If we want to access the vector **nr.of.fingers** from the data frame **peripherals** from the list **mashadata**, then we can do it in the following way:
+
+```{r }
+mashadata[["peripherals"]]$nr.of.fingers
+```
+
+but not like this:
+
+```{r }
+mashadata["peripherals"]$nr.of.fingers
+```
+
+There is one thing to note when dealing with lists. Data frame will not let you include two columns with the same name. List would not care less:
+
+```{r }
+list2<-list(a=3, b=4, a=5)
+list2$a #Not even a warning!
+```
+
+The reason we pay so much attention to lists, is that a lot of the results R will give you, are in the form of lists. Take t.test() -- t test compares two samples and asks if it is statistically viable that they come from the same population, that the differences could be just thanks to sampling error. If we only give it one vector as an input, it will tell us whether the mean is statistically different from 0.
+
+Lets do a t-test for **Literacy**-variable (measuring literacy levels) in our **piaac** dataset^[Note that we are using the piaac data incorrectly here! In reality there are ten different plausible values given for literacy levels, as there is considerable uncertainty involved. Do do it correctly you should use all the information -- this is possible with a package called **svyPVpack**. Neither do we use the weights here.]:
+
+```{r }
+t.test(piaac$Literacy)
+```
+
+It will give us 95% confidence intervals for the population. Meaning -- considering this sample, believing that this is a random sample, we would believe that the correct average for the whole population should be inside this interval with quite a high certainty.
+The average for the sample is 275,64, we believe, that the average for the whole population should fall somewhere between 275...277.
+
+`t.test()` shows us the results, but if we save it to a data object, we will find out, that it actually produces a list. Lets do it:
+
+```{r}
+result <- t.test(piaac$Literacy)
+class(result)
+typeof(result)
+str(result)
+```
+
+
+\vspace{4mm}  \color{red}Your turn: 
+
+* confidence intervals are inside this list as a vector called **conf.int**. Can you access it?
+     1) create a variable called **lower**, and assign it the lower value of conf.int (the first value in this vector)
+     1) create a variable called **upper**, and assign it the upper value of conf.int (the second value in this vector)
+
+\color{black} \vspace{5mm} 
+
+
+#Functions
+
+Writing a custom function or command in R is extremely simple. Take a look at the example:
+
+```{r }
+timesthree<-function(x){ #we name the function and say that its input will be named x
+  result <- x * 3  #we do some stuff
+  return(result) #we will return the answer
+}
+```
+
+You now need to make R aware of the new function -- just select it and click Run (or cntrl+enter).
+
+Lets find out how it works:
+
+```{r}
+timesthree(4)
+timesthree(c(3, 4, 5))
+```
+
+We know that functions could have default values. This is how to specify the defaults:
+
+```{r }
+multiplydivide<-function(x, multiplier=3, divisor=1){
+  result <- x * multiplier / divisor  #use the input
+  return(result) #return the result
+}
+```
+
+If we will not give any values for **multiplier** or **divisor**, then it will use the default values. But we can change them:
+
+```{r}
+multiplydivide(x=4)
+multiplydivide(x=4, multiplier=1, divisor=2)
+```
+
+Couple of things to consider when writing functions -- think through what kind of data structure do you give the function as an input. Is it a data frame? Is it a vector? This is the object that will be called x now, you will need to address it appropriately.
+
+
+##Minimal about conditional statements and control flows in R
+
+You can write conditional statements in R in the following way
+
+```{r, eval=FALSE}
+if (condition) {
+  whattodo
+} else {
+    dosomethingelse #else part is not required
+}
+```
+
+For example^[You do not need to use the square brackets, if the `whattodo` is a single line. For more lines you need the brackets.]:
+
+```{r}
+nameOfTheBear<-"George" #let us have a bear named George
+
+if(nameOfTheBear=="George") friendOfABear<-"Tom"
+if(nameOfTheBear=="Bill") friendOfABear<-"Mary"
+
+friendOfABear #who is the friend of the bear?
+```
+
+Another useful feature is a for cycle^[Note that we are using `in` here, not `%in%`!]:
+
+```{r}
+for (i in c(1:10)){
+cat(i)
+}
+
+```
+
+`cat()` will write the object into a standard output -- into console. You notice that it will write the stuff without any whitespace. Lets change it:
+
+```{r eval=F}
+
+for (i in c(1:10)){
+cat(paste(i, "\n", sep=""))
+}
+
+```
+What I did here was paste'ing multiple strings together, and telling it to not leave any spaces between them. This is a useful command, lets try it again:
+
+```{r}
+paste("Ahha", "uhhuu")
+```
+
+You can go through the values of some variables (all the unique values of factor are given by `levels(df$factorvar)`, all the unique values of a character-type variable can be accessed by `unique(df$textvar)`:
+
+```{r}
+for (i in levels(piaac$gender)){
+  cat(i)
+  tmp <- filter(piaac, gender==i)
+  averagewage <- mean(tmp$earnmth, na.rm=T)
+  cat("\nAverage wage of", i, "is", averagewage, "\n")
+}
+```
+
+
+To learn more about control flow in R take a look at the following free tutorial: \url{https://www.datacamp.com/courses/intermediate-r}.
+
+-----
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+1) create a function called **subtract**, which takes as an input two data objects (for examplem *a* and *b*) and subtracts one from the other. 
+
+2) create a function called **findlower**, which takes in a vector, does a t-test and returns the lower bound. First of all look at what `t.test(piaac$pvnum1)` gives you. Write out the command to get this lower bound out of this. Then replace `piaac$pvnum` with `x` or whatever you are using as an input varible for the function and return the answer.
+
+2) create a function called **findupper**, which takes in a vector, does a t-test and returns the upper bound.
+
+
+4) **Only for people who are too quick:** 
+Rewrite the previous function, that found the upper bound so, that you can give it additional parameter specifing which bound to return (by default "lower"), and if it is "lower", then it returns the lower bound, if it is "upper", it returns the upper bound.
+
+
+
+\color{black} \vspace{5mm} 
+
+-----
+
+You can use your newly created functions in `dplyr` `summarize` calls. Lets try it:
+
+```{r eval=F}
+piaac %>%
+  group_by(gender)%>%
+  summarize(lowernum=findlower(pvnum1), averagenum=mean(pvnum1), uppernum=findupper(pvnum1))
+```
+
+#Joining data
+
+In the real life you do not have data in one dataset. You have multiple datasets you would like to join with each other. `dplyr` offers functions for just that. We have `left_join()`, `right_join()`, `inner_join()`, `full_join()` `anti_join()` and `semi_join()`. Lets take a look at them. Lets create couple of small datasets:
+
+```{r}
+animallength <- data.frame(animal=c("cat", "dog", "elephant"), length=c(10, 20, 50))
+animalwidth <- data.frame(animal=c("cat", "dog", "bear"), width=c(5, 15, 10))
+```
+
+And lets try it:
+
+```{r message=FALSE, warning=FALSE}
+animals <- left_join(animallength, animalwidth)
+animals
+```
+It took all the animals from the first dataset (the dataset on the left) and added the values from the second dataset to these. If it could not find a matching animal from the second dataset, it added a `NA`. 
+
+By default it tries to merge the datasets by the variables present in both datasets. In case the variable names are different in different datasets (*e.g.* Company in the first one and Firm in the second one) you can specify this with a parameter `by=c("Company", "Firm")`.
+
+The `right_join()` would take all the animals in the second dataset and try to add columns from the first dataset to these^[Why would you need both `left_join()` and `right_join()` if you could just switch the arguments? The reason is the piping in tidyverse -- if you use `%>%` the result of the previous lines of code will be presented as the first argument to `right_join()` or `left_join()`. ].
+
+`full_join() would retain all the animals from both dataset:
+```{r message=FALSE, warning=FALSE}
+full_join(animallength, animalwidth)
+```
+And `inner_join()` would only leave in the animals which are present on both datasets:
+
+```{r message=FALSE, warning=FALSE}
+inner_join(animallength, animalwidth)
+```
+
+`anti_join()` would compare the datasets and remove everything that is present in both dataset, leaving only the rows which are in the first dataset and not in the second one (you'll actually find use to this -- this is a quick way for testing whether there are some values in one dataset that are missing in another).
+
+```{r message=FALSE, warning=FALSE}
+anti_join(animallength, animalwidth)
+```
+
+```{r message=FALSE, warning=FALSE}
+semi_join(animallength, animalwidth)
+```
+
+
+----
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+First read in the the following datasets: \url{http://www.ut.ee/~iseppo/gdppercap.csv} and \url{http://www.ut.ee/~iseppo/population.csv}. But use `read_csv()` from `readr` package. We have used base-R-s `read.csv()` mostly in the class^[The reason being that at one point `readr` had a bug and did not work well with internet addresses -- this is fixed now.], but readr is in fact a better option. It does some things differently from `read_csv()`: it does not convert text to factors automatically (you have to do it yourself manually by `df$variable <- as.factor(df$variable)`), it retains the original column names if they contain spaces or other special characters (`read.csv()` replaces them with points), it even tries to parse the dates and convert them to date-type variables. It also reads zipped files and it is much quicker than `read.csv()`. Note that expects the files to be in UTF-8 encoding by default.
+
+* take a look at these files -- which variables do they contain? Now join them so that all the countries present in either of the datset would be included. For how many countries is there no data of GDP per capita for this year?
+
+```{r echo=F, message=FALSE, warning=FALSE}
+library(readr)
+gdppercapita <- read_csv("gdppercap.csv")
+population <- read_csv("population.csv")
+```
+
+
+\color{black}
+
+----
+
+You might also want to add some datasets "on top of each other". Base-R offers a function called `rbind()` for this (and `cbind` to bind together columns), dplyr has `bind_rows()` -- a somewhat more intelligent version. Download the following files: 
+
+Read in the following files:
+
+```{r eval=F}
+q1.2017 <- read_csv("http://www.ut.ee/~iseppo/q12017.gz")
+q2.2017 <- read_csv("http://www.ut.ee/~iseppo/q22017.gz")
+q3.2017 <- read_csv("http://www.ut.ee/~iseppo/q32017.gz")
+```
+
+```{r echo=F, message=F}
+q1.2017 <- read_csv("q12017.gz")
+q2.2017 <- read_csv("q22017.gz")
+q3.2017 <- read_csv("q32017.gz")
+```
+
+Take a look at them. Oh, they are in Estonian! These are all the business entities in Estonia detailing how many people they employed, how much did thay pay VAT and how much employment taxes. Estonian tax and customs board gives this kind of data out every quarter and you can download it from their website.
+
+What could we do with this data? Lets add it together to one big dataframe! But to be able to tell the difference -- from which quarter was the data, we will need to add the information to the datasets:
+
+```{r}
+q1.2017$quarter <- "q1.2017"
+q2.2017$quarter <- "q2.2017"
+q3.2017$quarter <- "q3.2017"
+```
+
+Now we can create a single dataset:
+
+```{r}
+tax.2017 <- bind_rows(q1.2017, q2.2017, q3.2017)
+dim(tax.2017)
+```
+
+----
+
+\vspace{4mm}  \color{red} Your turn:\marginnote{YOUR TURN}
+
+We have been using `group_by()` and `summarize()` a lot.
+
+* Can you find the nr of employees (sum of employees) by county and quarter using these two verbs? Use `na.rm=T` in the `sum()` as a parameter
+
+```{r echo=F}
+employees.2017 <- tax.2017%>%
+  group_by(county, quarter)%>%
+  summarize(nrofemployees=sum(employees, na.rm=T))
+
+head(employees.2017, n=3)
+```
+
+We were using `spread()` from the package `tidyr` to convert tidy data to wide format. Load the package `tidyr`, look at the help text of spread and spread the data so that the name of the quarter becomes a new variable and the `nrofemployees` will be the thing that will be presented in the cells. Remember, you had to specify the `key` (which variable contents will now be turned to new variables) and the `value`. The result should look something like this:
+
+```{r echo=F, message=F, warning=F}
+library(tidyr)
+employees.wide <- spread(employees.2017, key=quarter, value=nrofemployees)
+head(employees.wide, n=3)
+```
+* Create a new variable in this dataset that you just created called change, and make it so that it would be the difference between `q3.2017` and `q1.2017`. Arrange the dataset by this variable. Which  counties created the most jobs and which ones the least?
+
+\color{black}
+
+-----
+
+# An overly quick intro to regressions in R
+
+First lets reread the piaac dataset without the modifications we have made into it:
+
+```{r message=FALSE, warning=FALSE, include=FALSE, paged.print=FALSE}
+piaac <- read.csv("piaacest.csv")
+```
+
+```{r eval=F}
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+```
+
+
+So you want to run some regressions. How to do it in R? We will use a regular least squares regression here, but everything else would be using more or less the same syntax.
+
+First specify a regression model:
+
+```{r}
+piaac$logincome <- log(piaac$earnmth)
+model1 <- lm(logincome ~ edlevel3 + gender, weights=weights, data=piaac)
+model1
+```
+The `model1` is not terribly informative, showing only the model and the point estimates. Lets try `summary()`:
+
+```{r}
+summary(model1)
+```
+
+This is slightly better -- you get a traditional regression table with standard errors and p-values etc. As we were using logincome as the dependent variable we can interpret the coefficients roughly as percentages^[Economists always tend to interpret them as rough percentages, but be aware if there are anyone from mathematics close to you. For small values of these coefficients they are indeed very close to percentages (so if a coefficient 0.1 for genderMale would have meant that men earn ~10% more). The precise nr would be `exp(0.1)-1=0.1051`, which is around 10%. But `exp(0.3)-1`is already 0.35 and `exp(0.5)-1` is `0.65` (so you should say 65% instead of 50% here). Handle this with some care when the coefficient is higher than 0.2 or so, or someone will remark it at your presentation.].
+
+This results dataobject that we just wrote the regression results into, is again a list, and we can get everything out of this list (take a look at `str(model1)`). You will find coefficients there, residuals, fitted values etc. So to access some coefficients (e.g. for automatic inclusion in our report) we can call:
+
+```{r}
+model1$coefficients["edlevel3Medium"]
+```
+
+There is actually a package called `broom` in the tidyverse that makes this much easier creating a regular dataframe of the coefficients:
+
+```{r}
+library(broom)
+model1overview <- tidy(model1)
+model1overview
+```
+
+Another function `glance()` gives you a dataframe of some parameters helping you to understand how precise the model is with this data. 
+```{r}
+glance(model1)
+```
+
+From the model object you can access fitted values, but residuals are usually more interesting. Lets add the residuals to the original dataframe. To do this we can use `augment()` function from broom^[There is an alternative -- `residuals()` in base R would provide us the vector of residuals, augment() will work on many types of models but not all, the `residuals()` is usually implemented everywhere.]:
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE}
+piaacRes <- augment(model1, data=piaac)
+```
+
+Note that the resulting piaacRes dataset is smaller than piaac -- all the values which had NA-s in one of the regression variables are removed from here (you can add `na.action=na.exclude` as a parameter to the regression call leave the NA-s in).
+
+Why is this important? You can now do some quick analysis of residuals – is there heteroscedasticity in the data? Just plot the residuals against other variables. Would adding some additional variables help? Lets try it and plot the residuals against age:
+
+```{r message=FALSE, warning=FALSE, paged.print=FALSE, fig.margin=T}
+library(ggplot2)
+ggplot(piaacRes, aes(x=age, y=.resid))+
+  geom_point()+
+  geom_smooth()+
+  theme_minimal()
+```
+
+There is clearly a relationship, but it does not seem to be a linear one. Lets add a polynomial of age to the model:
+
+```{r}
+model2 <- lm(logincome ~ edlevel3 + gender + poly(age,2), weights=weights, data=piaac)
+```
+
+We could have added `+age +age^2` as well -- this would not have changed any other coefficients, but would mess up prediction intervals (why? Because R would treat `age` and `age^2` as separate independent variables while they are clearly not). You wouldn't usually care about prediction intervals, so many people are just adding the `age` and `age^2` to the model and so can you.
+
+If you want to add cross-effects, use `*`:
+
+```{r}
+model3 <- lm(logincome ~ edlevel3*gender + poly(age,2), weights=weights, data=piaac)
+```
+
+And to change the base-value of a nominal variable, make the value you want to use as a base to be the first in the factor:
+
+```{r}
+library(forcats)
+piaac$edlevel3<-fct_relevel(piaac$edlevel3, "Secondary")
+model4 <- lm(logincome ~ edlevel3*gender + poly(age,2), weights=weights, data=piaac)
+```
+
+
+## Predictions at specified values
+
+You can easily plot the predicted values of a regression by using a
+`predict()` function. You need to give the dataframe newdata to it,
+specifying for which values you want to get the predictions. You can
+add the initial dataset (but you would also get the predicted results
+for the initial dataset with a function fitted(modelname)).
+To create a dataset of all possible values, use `expand.grid()`:
+
+```{r}
+mydata <- expand.grid(edlevel3=levels(piaac$edlevel3), gender=levels(piaac$gender), age=c(20:65))
+mydata$prediction <- predict(model3, newdata=mydata)
+ggplot(mydata, aes(x=age, y=prediction))+
+  geom_point()+
+  facet_wrap(~edlevel3)+
+  theme_minimal()
+```
+
+
+If you want to futher visualize your regressions, take a look at package `visreg` \url{http://pbreheny.github.io/visreg/}. If you wan to have nicely outputed regression tables, package `stargazer` should help you out: \url{https://www.jakeruss.com/cheatsheets/stargazer/}. 
+
+
