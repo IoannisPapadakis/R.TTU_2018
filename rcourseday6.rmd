@@ -1,0 +1,328 @@
+---
+title: "Intro to R day 6"
+output:
+  pdf_document: default
+  html_notebook: default
+---
+
+
+We'll do this day in R Notebook. 
+
+To create a new chunk either choose Insert - R from the menu right above this pane, or press cntrl alt i from the keyboard.
+
+And you can now write regular R code into the chunk.
+```{r message=FALSE}
+library(tidyverse)
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+summary(piaac$gender)
+```
+
+
+#Lists
+We will continue with another data type in R, called lists:
+
+Lets create a nr of R objects and then create a list from them:
+```{r}
+name <- "Masha"
+surname <- "Mishka"
+length <- 1.65
+peripherals <- data.frame(nr.of.fingers =c(5, 5),
+                          nr.of.toes=c(5,5))
+peripherals
+
+mashadata <- list(first.name=name, 
+                  surname=surname, 
+                  length=length,
+                  peripherals=peripherals)
+mashadata
+``` 
+
+Why do we need lists? A lot of R functions give you lists as a result. 
+
+I am showing this with some regular regression:
+
+```{r}
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+```
+
+
+```{r}
+regr1 <- lm(data=piaac, log(earnmth) ~ gender + pvnum1)
+regr1
+summary(regr1)
+```
+
+But this regr1 object is actually a list, containing a lot of additional information:
+
+```{r}
+str(regr1)
+```
+
+```{r}
+effectMale <- regr1[["coefficients"]]["genderMale"]
+```
+
+You can now use this inline aswell: Effect for males is `r round(effectMale,2)`.
+
+So -- to access data objects put into a list, you will need to use double square brackets: `listname[[objectname]]`
+
+```{r}
+mashadata[["first.name"]]
+```
+
+Lets try the same with t-test:
+
+```{r}
+t.test(piaac$pvlit1)
+```
+
+It is actually a list, a list from where you can get the evaluated parameters out of:
+```{r}
+result <- t.test(piaac$pvlit1)
+str(result)
+result[["conf.int"]]
+```
+
+```{r}
+lower <- result[1]
+upper <- t.test(piaac$pvlit1)[["conf.int"]][2]
+class(result)
+```
+
+
+#Functions
+
+Creating functions in R is actually really easy:
+
+```{r}
+multiply_by_3 <- function(x){
+  result <- x*3
+  return(result)
+}
+multiply_by_3(5)
+```
+
+```{r}
+multiply_by_3(4)
+```
+
+```{r}
+y<-c(3,4,5)
+multiply_by_3(y)
+```
+
+```{r}
+multiplydivide <-function(x, multiplier =3, divisor =1){
+  result <- x * multiplier/ divisor
+  return(result)
+}
+```
+
+```{r}
+multiplydivide(x =4)
+```
+
+
+```{r}
+multiplydivide( x = 4, multiplier = 1, divisor = 2)
+```
+
+
+```{r}
+multiplydivide
+```
+
+Just remember to load the function in, once you have written it. And you can start using it.
+
+
+
+
+Your turn:
+```{r}
+
+substract <- function(a, b){
+  result <- a-b
+  return(result)
+}
+
+substract(5, 8)
+```
+
+```{r}
+
+findlower <- function(x){
+  ttestresult <- t.test(x)
+  lower <- ttestresult[["conf.int"]][1]
+  return(lower)
+}
+
+findupper <- function(x){
+  ttestresult <- t.test(x)
+  lower <- ttestresult[["conf.int"]][2]
+  return(lower)
+}
+```
+
+```{r}
+findupperorlower <- function(x, whichone="lower"){
+  ttestresult <- t.test(x)
+  if(whichone=="lower"){
+  answer <- ttestresult[["conf.int"]][1]
+  }
+  if(whicone=="upper"){
+  answer <- ttestresult[["conf.int"]][2]
+  }
+  return(answer)
+}
+```
+
+```{r}
+library(tidyverse)
+piaac %>%
+  group_by(gender)%>%
+  summarize(lowernum=findlower(pvnum1), avergenum=mean(pvnum1, na.rm=T), uppernum=findupper(pvnum1))
+  
+```
+
+
+You can save your functions into an R script file and then just source the file to have them available:
+
+```{r, eval=FALSE}
+source("functions2.R")
+```
+
+source() runs the file and performs everything that is written into it. 
+
+# Tidy data, data in wide and long format
+
+R loves to have data in tidy format, one measurement per line.
+
+```{r}
+library(eurostat)
+gdpdata <- get_eurostat("tec00114")
+gdpdata
+```
+
+
+This is data in wide format:
+```{r}
+
+animals <- read.csv("http://www.ut.ee/~iseppo/animals.csv")
+animals
+```
+
+To convert it to long format, you would use gather() from package tidyr:
+
+```{r}
+gather(animals, key="measurement", value="value",
+       length, width,age)
+```
+
+```{r}
+gdp <- read.csv("http://www.ut.ee/~iseppo/gdpestimate.csv")
+gdp
+library(lubridate)
+gdp$date <- ymd(gdp$date)
+```
+
+```{r}
+ggplot(gdp, aes(x=date))+
+  geom_line(aes(y=firstEstimate))+
+  geom_line(aes(y=latestEstimate), color="red")
+```
+
+```{r}
+gdp.long <- gather(gdp, key=measurement, value=value, firstEstimate,
+                   latestEstimate)
+head(gdp.long)
+ggplot(gdp.long, aes(x=date))+
+  geom_line(aes(y=value, color=measurement))
+```
+
+Spread
+```{r}
+gdpdata <- get_eurostat("tec00114")
+gdpdata
+gdpdata_wide <- spread(gdpdata, key=geo, value=values)
+library(knitr) # for function "kable"
+kable(head(gdpdata_wide))
+```
+
+# Joining data
+
+```{r}
+animallength <- data.frame(animal=c("cat", "dog", "elephant"),
+                           length=c(10,20,50))
+animalwidth <- data.frame(animal=c("cat", "dog", "bear"),
+                          width=c(5, 15, 10))
+
+animallength <- read.csv("http://www.ut.ee/~iseppo/animallength.csv")
+animalwith <- read.csv("http://www.ut.ee/~iseppo/animalwidth.csv")
+animallength
+```
+
+```{r}
+animalwidth
+```
+
+```{r}
+anti_join(animalwidth, animallength)
+```
+
+```{r}
+left_join(animalwidth, animallength,
+          by=c("animal"="animal"))
+```
+
+
+Your turn at page 16:
+```{r}
+library(readr)
+gdppercap <- read_csv("http://www.ut.ee/~iseppo/gdppercap.csv")
+
+population <- read_csv("http://www.ut.ee/~iseppo/population.csv")
+```
+
+lets take a look:
+
+```{r}
+summary(gdppercap)
+summary(population)
+```
+
+```{r}
+countries <- full_join(gdppercap, population)
+```
+
+```{r}
+anti_join(population, gdppercap)
+```
+
+```{r}
+q1.2017 <- read_csv("http://www.ut.ee/~iseppo/q12017.gz")
+q2.2017 <- read_csv("http://www.ut.ee/~iseppo/q22017.gz")
+q3.2017 <- read_csv("http://www.ut.ee/~iseppo/q32017.gz")
+head(q1.2017)
+
+tax.2017 <- bind_rows(q1.2017, q2.2017, q3.2017)
+dim(tax.2017)
+```
+
+```{r}
+county_employees <- tax.2017%>%
+  group_by(county, quarter)%>%
+  summarize(nrOfEmployees=sum(employees, na.rm=T))
+county_employees
+
+county_employees_wide <- spread(county_employees, key=quarter, value=nrOfEmployees)
+county_employees_wide
+```
+
+```{r}
+county_employees_wide %>%
+  mutate(change = q3.2017-q1.2017)%>%
+  arrange(change)
+```
+
+
+
