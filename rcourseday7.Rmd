@@ -1,0 +1,116 @@
+---
+title: "rcourseday7"
+author: "Nicolas Reigl"
+date: "3/9/2018"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+library(tidyverse)
+library(stringr)
+```
+
+Help for left join
+```{r}
+?left_join
+
+```
+
+```{r}
+taxdata <- read_csv("http://www.ut.ee//~iseppo/taxdata.gz")
+```
+
+```{r}
+names(taxdata)
+```
+
+```{r}
+nr_of_companys <-taxdata %>% 
+  group_by(quarter, county) %>% 
+  summarise(nrOfCompanies = n())
+```
+
+or 
+
+
+```{r}
+nr_of_companys <-taxdata %>% 
+  group_by(quarter, county) %>% 
+  summarise(nrOfCompanies = length(unique(code))) #  unique creates vector so we need also length
+```
+
+
+
+```{r}
+nr_of_companys
+```
+
+```{r}
+spread(nr_of_companys, key = "quarter", value = "nrOfCompanies")
+```
+
+Who has county of NA?
+
+```{r}
+uhuu <- taxdata %>% 
+  filter(is.na(county))
+
+```
+
+
+An overly quick intro to regression in R
+
+```{r}
+piaac<-read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+```
+
+
+```{r}
+piaac
+```
+
+
+
+```{r}
+piaac$logincome<- log(piaac$earnmth)
+```
+
+```{r}
+str(piaac)
+summary(piaac)
+```
+
+
+```{r}
+ggplot(piaac, 
+       aes(x=pvnum1, y=logincome))+
+  geom_point()+
+  geom_smooth(aes(color = gender))
+```
+
+
+```{r}
+model1<- lm(logincome ~ edlevel3 + gender, weights = weights, data = piaac)
+```
+
+
+
+```{r}
+summary(model1)
+```
+
+```{r}
+model2<- lm(logincome ~ edlevel3 + gender +poly(age,2), weights = weights, data = piaac)
+
+```
+
+```{r}
+summary(model2)
+```
+
+
+
