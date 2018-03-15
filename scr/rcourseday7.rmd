@@ -1,0 +1,838 @@
+---
+title: "Intro to R session 7"
+output:
+  html_document:
+    df_print: paged
+---
+
+```{r}
+library(tidyverse)
+#stringr
+?left_join
+```
+
+Reminder about converting data between wide and long format. 
+
+```{r}
+animals <- read.csv("http://www.ut.ee/~iseppo/animals.csv")
+animals
+```
+
+```{r}
+library(eurostat)
+get_eurostat("tec00114")
+
+```
+
+
+```{r eval=F}
+gather()
+spread()
+```
+
+
+
+```{r}
+animals
+animals.long <- gather(animals, key="My fancy variable",
+       value="The Value",
+       length, width, age)
+animals.long
+```
+
+lets spread it again:
+
+```{r}
+spread(animals.long, key="My fancy variable", value="The Value")
+```
+
+
+
+Your turn at page 3:
+
+```{r}
+library(tidyverse)
+library(readr)
+taxdata <- read_csv("http://www.ut.ee/~iseppo/taxdata.gz")
+names(taxdata)
+```
+
+```{r}
+library(dplyr)
+nr_of_companies <- taxdata %>%
+  group_by(quarter, county)%>%
+  summarize(nrOfCompanies = length(unique(code)))
+nr_of_companies  
+unique(taxdata$type)
+```
+
+```{r}
+nr_of_companies
+spread(nr_of_companies, key="quarter", value="nrOfCompanies")
+```
+
+```{r}
+uhhuu <- taxdata %>%
+  filter(is.na(county))
+```
+
+
+Reopen the piaac data:
+```{r}
+piaac <- read.csv("http://www.ut.ee/~iseppo/piaacest.csv")
+```
+
+Quick overview of dataset
+```{r}
+names(piaac)
+summary(piaac)
+head(piaac)
+str(piaac)
+```
+
+Create a new variable logincome:
+```{r}
+piaac$logincome <- log(piaac$earnmth)
+```
+
+Graphical overview
+```{r}
+ggplot(piaac, aes(x=pvnum1, y=logincome))+
+  geom_point()+
+  geom_smooth(aes(color=gender))
+```
+
+Regression model
+
+```{r}
+model1 <- lm(logincome ~ edlevel3 + gender+ poly(age, 2), data=piaac, weights=weights )
+summary(model1)
+```
+
+The regression object is a list, you can get stuff out of it:
+```{r}
+str(model1)
+model1[["coefficients"]]["edlevel3Low"]
+
+```
+Alternatively - this is an easier way
+```{r}
+library(broom)
+tidy(model1)
+```
+
+
+```{r}
+glance(model1)
+```
+
+Adding the residuals etc to the dataset:
+```{r}
+piaacRes <- augment(model1, piaac)
+```
+
+Is there something able to predict the residuals? Is there more information in the data?
+
+```{r}
+ggplot(piaacRes, aes(x=pvnum1, y=.resid))+
+  geom_smooth()
+```
+
+
+Predicting specific values:
+```{r}
+predict(model1, newdata=data.frame(gender="Male", edlevel3="Low",
+                                   age=30))
+```
+
+Creating a new dataset of interesting values:
+
+```{r}
+possiblevalues <- expand.grid(gender=c("Male", "Female"), edlevel3=unique(piaac$edlevel3),
+            age=c(10:100))
+```
+
+using broom::augment() instead of predict:
+```{r}
+possiblevalues <- augment(model1, newdata=possiblevalues)
+head(possiblevalues)
+```
+
+
+Changing the base category in multinominal regression. You just need to bring the new base category to be the first one in the factor variable:
+```{r}
+summary(model1)
+library(forcats)
+piaac$edlevel3 <- fct_relevel(piaac$edlevel3, "Medium")
+```
+
+
+Print the predictions of the model:
+```{r}
+names(possiblevalues)
+ggplot(possiblevalues, aes(x=age, y=.fitted))+
+  geom_line(aes(color=gender))+
+  facet_wrap(~edlevel3)
+```
+
+coefficient plot:
+```{r}
+library(coefplot)
+coefplot(model1)
+
+```
+
+check also packages like sjplot, margins
+
+nicelooking regression tables:
+
+```{r, results='asis'}
+library(stargazer)
+?stargazer
+
+piaac$logincome <- log(piaac$earnmth)
+model1 <- lm(data=piaac, logincome ~ gender+pvnum1+ edlevel3)
+model2 <- lm(data=piaac, logincome ~gender +pvnum1+edlevel3+pvlit1)
+model3 <- lm(data=piaac, logincome ~ pvnum1 + edlevel3 + pvlit1)
+stargazer(model1, model2, model3, type="html",
+          style="aer",
+          out="regr1.html")
+```
+
+Simulating data
+
+```{r}
+simdata <- data.frame(gender=c(rep("Male", 600), rep("Female", 1400)))
+simdata
+```
+
+
+
+```{r}
+set.seed(10)
+rbinom(n=10, size=1, prob=0.5)
+rbinom(n=10, size=1, prob=0.5)
+rbinom(n=10, size=1, prob=0.5)
+
+```
+
+```{r}
+rnorm(n=100, mean=100, sd=10)
+```
+
+
+
+
+```{r}
+simdata$height <- NA
+head(simdata)
+set.seed(2018)
+simdata$height[simdata$gender=="Male"] <-rnorm(n=600, mean=180, sd=8)
+simdata$height[simdata$gender=="Female"] <- rnorm(n=1400, mean=173, sd=8)
+```
+
+
+
+Your turn page 8
+
+```{r}
+library(tidyverse)
+ggplot(simdata, aes(x=height))+
+  geom_histogram()+
+  facet_wrap(~gender)
+```
+```{r}
+simdata %>%
+  group_by(gender)%>%
+  summarize(mean=mean(height))
+```
+
+```{r}
+simdata$potential <- 50 + simdata$height*0.2
+```
+
+
+```{r}
+simdata$talent <- rnorm(n=2000, mean=0, sd=10)
+simdata$result <- simdata$potential + simdata$talent
+```
+
+```{r}
+ggplot(simdata, aes(x=height, y=result))+
+  geom_point()+
+  geom_smooth()
+```
+```{r}
+regr1 <- lm(result ~ height, data=simdata)
+summary(regr1)
+```
+
+```{r}
+simdata$result <- 50 + 0.2*simdata$height + simdata$talent + 5*(simdata$gender=="Male")
+```
+
+```{r}
+regr2 <- lm(data=simdata, result ~ height)
+summary(regr2)
+```
+
+
+
+```{r}
+ggplot(simdata, aes(x=height, y=result))+
+  geom_point()+
+  geom_smooth(method="lm")+
+  geom_smooth(method="lm", aes(color=gender))
+```
+
+
+
+We will now take a look at working with time series data in R. We can manipulate data and time objects in objects of the `data.frame`. 
+
+Let us install first a new package, *tidyquant*, which brings financial analysis to the 'tidyverse'. 
+
+```{r}
+library(tidyquant)
+library(tidyverse)
+```
+
+Let us download some stock prices
+
+```{r}
+goog_prices  <- tq_get("GOOG", get = "stock.prices", from = " 1990-01-01") # from yahoo 
+aapl_prices  <- tq_get("AAPL", get = "stock.prices", from = " 1990-01-01")
+```
+
+
+```{r}
+library(knitr)
+kable(head(aapl_prices))
+```
+
+
+```{r}
+kable(head(goog_prices))
+```
+
+We have already seen how to join two dataset
+
+```{r}
+stockprices <-bind_rows("aapl"=aapl_prices, "goog"=goog_prices, .id = "id")
+kable(head(stockprices))
+```
+
+```{r}
+stockprices<- stockprices %>% 
+  mutate(date = ymd(date))
+```
+
+
+```{r}
+ggplot(stockprices, aes(x = date, y=adjusted))+
+  geom_line(aes(color=id))+
+  scale_y_log10()
+```
+
+We want the first value to be the beginning of the time period.
+use `first()` function to get the first ‘adjusted’ stock price for each company and subtract it from each stock price.
+We can calculate the percent change since the beginning based on this absolute change values like below.
+
+
+```{r}
+stockprices_1 <-stockprices %>% 
+  filter(date >= today() - years(10)) %>% 
+  group_by(id) %>%
+  arrange(date) %>% 
+  mutate(growth = adjusted - first(adjusted), 
+         growth_percent = (adjusted - first(adjusted))/first(adjusted)*100) %>% 
+  ungroup()
+stockprices
+```
+
+
+
+
+```{r}
+library(cowplot)
+p1<-ggplot(stockprices_1, aes(x = date, y=growth))+
+  geom_line(aes(color=id))
+p2<-ggplot(stockprices_1, aes(x = date, y=growth_percent))+
+  geom_line(aes(color=id))
+plot_grid(p1,p2)
+```
+
+We can also caculate the moving/ rolling averages. For that install and load the package `RcppRoll`. 
+
+
+```{r}
+# install.packages("RcppRoll")
+library(RcppRoll)
+```
+
+
+```{r}
+stockprices_1<-stockprices_1 %>% 
+  group_by(id) %>% 
+  mutate(movingaverage = roll_mean(adjusted, 30, align="right", fill = 0))
+```
+
+```{r}
+library(scales)
+ggplot(stockprices_1, aes(x = date, y= movingaverage))+
+  geom_line(aes(color=id))
+```
+
+Even though the `data.frame` object is one of the core objects to hold data in R, you'll find that it's not always efficient or possible to use `data.frames` when you're working with time series data.
+
+
+We have seen in the last lectures already `data.frame` objects and `lists` objects. 
+
+`R` has many time series classes for example `ts`, `xts` or `zoo` to name just the most important ones. 
+
+Let us now do go through some basic R time series principles and how to apply them. 
+
+
+```{r}
+library(zoo)
+library(xts)
+```
+
+The *base R* time series class is `ts`
+
+ - Create a univariate monthly time 
+```{r}
+ts1 <- ts(cumsum(1 + round(rnorm(750), 2)),
+          start = c(1954, 1), frequency = 12)
+str(ts1);
+start(ts1);
+end(ts1);
+frequency(ts1)
+time(ts1)
+```
+
+```{r}
+xts1<-as.xts(ts1)
+xts1
+head(coredata(xts1)) # core data of the time series object
+```
+
+```{r}
+autoplot(xts1)
+```
+
+
+```{r}
+str(xts1);
+start(xts1);
+end(xts1);
+frequency(xts1)
+time(xts1)
+head(xts1)
+tail(xts1)
+```
+
+
+Index
+```{r}
+index(xts1)
+```
+
+```{r}
+indexClass(xts1)
+```
+
+Replacing index class
+
+```{r}
+indexClass(convertIndex(xts1,'POSIXct'))
+```
+
+Get index class
+
+```{r}
+indexTZ(xts1)
+```
+
+Change format of time display
+
+```{r}
+indexFormat(xts1) <- "%Y-%m-%d"
+
+```
+
+Estimate frequency of observations
+
+```{r}
+periodicity(xts1)
+```
+
+Convert xts1 to yearly OHLC
+```{r}
+to.yearly(xts1)
+
+```
+
+
+Convert xts1 to monthly OHLC
+```{r}
+to.monthly(xts1)
+```
+
+
+
+Convert xts1 to quarterly OHLC
+```{r}
+# to.quarterly(xts1) # this works but the time index is not "nice"
+to.period(xts1,period="quarters")
+```
+
+Count the months in xts1
+
+```{r}
+nmonths(xts1)
+```
+
+
+
+Count the quarters in xts1
+
+```{r}
+nquarters(xts1)
+
+```
+
+Count the years in xts1
+
+```{r}
+nyears(xts1)
+```
+
+## Selecting, Subsetting & Indexing
+Select
+
+```{r}
+jan2010 <- xts1["2010-01"] #Get value for Jan 2010
+jan2010
+```
+
+```{r}
+xts1_2010 <- xts1["2010"]
+xts1_2010
+```
+
+
+
+Extract data from Jan to April ‘10 
+
+```{r}
+xts1_janapril <- xts1["2010/2010-04"]
+xts1_janapril
+```
+
+
+
+Get all data until March ‘10  
+```{r}
+
+xts1_janmarch <- xts1["/2010-03"] 
+xts1_janmarch
+```
+
+
+# Lag, Lead and Diff operator
+
+### Lag and diff operator for data.frames
+```{r}
+set.seed(123)
+vec_1 <- runif(5) # random uniform
+df_1<-cbind(lead = dplyr::lead(vec_1, 1), vec_1, lag = dplyr::lag(vec_1, 1))
+df_1
+```
+
+```{r}
+df_2<-cbind(lead = dplyr::lead(vec_1, 2), vec_1, lag = dplyr::lag(vec_1,2))
+df_2
+```
+
+
+
+### Lag `xts`
+
+
+
+```{r}
+xts2<-xts1["2016-01/"] 
+xts2
+dplyr::lag(xts2)
+stats::lag(xts2)
+```
+
+For a positive $k$, the series will shift the last value in time one period forward. 
+
+
+```{r}
+xts2_lag1<-lag(xts2,1)
+xts2_lag2<-lag(xts2,2)
+xts2_leadlag1<-merge(merge(xts2, xts2_lag1), xts2_lag2)
+xts2_lead1<-stats::lag(xts2,-1)
+xts2_lead2<-stats::lag(xts2,-2)
+xts2_leadlag2<-merge(xts2_lead1, xts2_lead2)
+xts2_leadlag <- merge(xts2_leadlag1, xts2_leadlag2)
+xts2_leadlag
+```
+
+
+### Lag `ts` and `zoo`
+
+Zoo and ts implement the lag behaviour in a different, and for most economists confusing way. One is the direction of the lag for a given $k$. `zoo` uses a convention for the sign of $k$ in which negative values indicate lags and positive values indicate leads. That is, in `zoo lag(x, k = 1)` will shift future values one step back in time. The second one is how *missing* values are handled, namely that no `NA` are shown. 
+
+```{r}
+ts2 <- as.ts(xts2)
+ts2
+```
+
+```{r}
+ts2_lag1<-stats::lag(ts2,1)
+ts2_lead1<-stats::lag(ts2,-1) 
+```
+
+```{r}
+ts2_lag1
+```
+
+
+The "k=1" lag series `ts2_lag1` starts one month earlier and there is no `NA` shown. 
+
+```{r}
+ts2_leadlag<-cbind(ts2,ts2_lag1)
+ts2_leadlag<-cbind(ts2_lead1, ts2_leadlag)
+ts2_leadlag
+```
+
+
+```{r}
+library(zoo)
+zoo2<-as.zoo(xts2)
+zoo2
+```
+
+
+```{r}
+str(zoo2)
+```
+
+```{r}
+zoo2_lag1<-stats::lag(zoo2,1) # LEAD!
+zoo2_lead1<-stats::lag(zoo2,-1) # LAG!
+zoo2_lag2<-stats::lag(zoo2,2) # LEAD!
+zoo2_lead2<-stats::lag(zoo2,-2) # LAG!
+```
+
+
+```{r}
+zoo2_leadlag<-merge(merge(zoo2, zoo2_lag1), zoo2_lead1)
+zoo2_leadlag
+```
+
+```{r}
+zoo2_leadlag2<-merge(merge(zoo2_leadlag, zoo2_lag2), zoo2_lead2)
+zoo2_leadlag2
+```
+
+
+## Diffs
+Calculate a difference of a series using diff(). A single (or "first order") difference is to see it as $x_t - x_{t-k}$ where $k$ is the number of lags to go back.
+
+
+```{r}
+diff(xts2)
+```
+
+
+
+These are the same
+```{r}
+diff(xts2, differences = 2)
+diff(diff(xts2))
+```
+
+
+```{r}
+diff(xts2, lag = 4)
+```
+
+## Linear regression
+
+For fitting a linear model to the time series data we can use the function `dynlm()` from the `dynlm` package. 
+
+```{r, eval= FALSE}
+install.packages("forecast")
+install.packages("wooldrige")
+
+```
+
+
+```{r}
+library(forecast)
+library(wooldridge)
+library(dynlm)
+library(stargazer)
+library(fpp)
+```
+
+Effects of personal exemption on fertility rates
+
+```{r}
+
+```
+
+
+```{r}
+tsdata<-ts(fertil3, start = 1913)
+```
+
+
+```{r}
+reg_dynlm <- dynlm(gfr ~ pe + L(pe) + L(pe, 2) +  ww2 + pill, data = tsdata)
+reg_lm <- lm(gfr ~ pe + (pe_1) + (pe_2) +  ww2 + pill, data = tsdata)
+
+```
+
+```{r, results='asis'}
+stargazer(reg_dynlm, reg_lm,  title="Regression Results", align=TRUE, type = "html", out = "regression.html")
+```
+
+```{r}
+checkresiduals(reg_lm)
+```
+
+
+
+However, note that the `predict()` function of the `dynlm` package is [**broken**](https://stats.stackexchange.com/questions/6758/1-step-ahead-predictions-with-dynlm-r-package) with new data if lagged variables are used.   
+
+### Forecasting with regression
+
+One way to fit with regression is to use the `tslm()` function from the `forecast` package. We take the example directly from [Rob Hyndmans](https://robjhyndman.com/) time series [book](https://otexts.org/fpp2/forecasting-regression.html). The package `fpp` accompaning his book includes a data set on  total quarterly beer production in Australia (in megalitres) from 1956:Q1 to 2008:Q3.  
+
+
+```{r}
+data(ausbeer)
+beer2 <- window(ausbeer, start=1992)
+fit.beer <- tslm(beer2 ~ trend + season) #  trend and seasonal dummies
+fcast <- forecast(fit.beer)
+autoplot(fcast) +
+  ggtitle("Forecasts of beer production using linear regression")
+```
+
+```{r}
+autoplot(beer)
+```
+
+
+## Classical decomposition
+
+The function `decompose()` can be used to decompose a time series into seasonal, trend and irregular components using moving averages. Deals with additive or multiplicative seasonal component.
+
+
+```{r}
+decompbeer <-decompose(beer)
+autoplot(decompose(beer))
+```
+
+
+## Seasonal (SEATS) decomposition
+
+For using the X13 “SEATS“ algorithm, first install the `seasonal` package.
+
+```{r}
+
+library(seasonal)
+```
+
+```{r}
+autoplot(AirPassengers)
+seas_airpass <-seas(AirPassengers)
+```
+
+The final function returns the adjusted series, the plot method shows a plot with the unadjusted and the adjusted series. The summary method allows you to display an overview of the model. 
+
+```{r}
+final(seas_airpass)
+plot(seas_airpass)
+summary(seas_airpass)
+```
+
+## ARIMA models
+
+### Stationarity and differencing
+
+```{r}
+series<- c("GDPCTPI") # estimate of chain link nominal gdp
+
+# download data via FRED 
+gdpchain<-tq_get(series,                         # get selected symbols
+            get="economic.data",             # use FRED
+            from="1954-01-01")               # go from 1954 forward
+
+```
+
+```{r}
+str(gdpchain)
+```
+
+
+Aggregate monthly to quarterly 
+
+
+```{r}
+gdpchain %>% 
+  mutate(yq = as.yearqtr(date))  %>%
+  dplyr::rename(gdp = price)  %>% 
+  group_by(yq) %>% 
+  mutate(loggdp = log(gdp)) -> gdpchain
+```
+
+Unit root tests
+
+
+```{r}
+adf.test(gdpchain$gdp, alternative = "stationary")
+adf.test(gdpchain$loggdp, alternative = "stationary")
+adf.test(diff(gdpchain$loggdp, 1), alternative = "stationary")
+```
+
+
+
+
+### ACF/PACF
+
+acf
+
+```{r}
+acf(gdpchain$gdp)
+acf(diff(log(gdpchain$gdp),4))
+```
+
+pacf
+
+```{r}
+pacf(gdpchain$gdp)
+pacf(diff(log(gdpchain$gdp),4))
+```
+
+ - Cross correlation between 2 timeseries.
+
+```{r}
+ccfRes <- ccf(mdeaths, fdeaths, ylab = "cross-correlation") 
+```
+
+### Autoregressive models
+
+```{r}
+ar1<-arima.sim(list(order=c(1,0,0), ar=.9), n=100)
+ar2<-arima.sim(list(order=c(1,0,0), ar=.5), n=100)
+
+autoplot(ar1)
+autoplot(ar2)
+```
+
